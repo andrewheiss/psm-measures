@@ -1,0 +1,19 @@
+name: "psm-measures"
+exclude: ["data", "misc", "Makefile", "LICENSE"]
+navbar:
+  title: "Measuring Public Service Motivation"
+output:
+  html_document:
+    theme: journal
+    css: html/fixes.css
+    highlight: pygments
+    md_extensions: +markdown_in_html_blocks+raw_html
+    code_folding: hide
+    code_download: true
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 4
+    fig_height: 4
+    fig_width: 6
