@@ -6,6 +6,9 @@ navbar:
     - text: "Data cleaning"
       icon: fa-table
       href: 01-clean_data.html
+    - text: "Summaries and distributions"
+      icon: fa-bar-chart
+      href: distributions.html
 output:
   html_document:
     theme: journal
