@@ -1,0 +1,131 @@
+---
+title: "Data cleaning"
+date: "2017-10-31"
+---
+
+```{r load-libraries, message=FALSE, warning=FALSE}
+library(rprojroot)
+library(tidyverse)
+library(haven)
+library(readxl)
+library(pander)
+library(stringr)
+library(DT)
+
+root <- find_rstudio_root_file()
+```
+
+## Load data
+
+There are two different versions of the data—an SPSS file and an Excel file—and neither are perfectly identical. These columns have issues:
+
+- `ID`: This columnn is full of NAs in SPSS; it exists in Excel.
+- `ACT`, `BIRTH`, `SAT`, `UGA_ID`: These columns are almost full of NAs in SPSS; they kind of exist in Excel—when values do exist, they're separated by commas, like `2,9`, `1,3`, `1, 8, 9, 0`, etc.
+- `BIRTH`: This column is almost full of NAs in SPSS; it kind of exists in Excel—when values do exist, they're also separated by commas.
+- Most other columns are fine, though some cells in Excel (like row 10 in `EDU_DAD`) have comma-separated values; in SPSS, the last value is used.
+
+```{r load-data}
+psm_raw_spss <- read_spss(file.path(root, "data", "data_raw", "Student PSM Survey Data.sav")) %>% 
+  zap_formats() %>% zap_widths()
+
+psm_raw_excel <- read_excel(file.path(root, "data", "data_raw", "Student PSM Survey Master Data.xlsx"),
+                            sheet = "Master Data")
+```
+
+#### Data from SPSS
+
+```{r show-spss, results="asis"}
+psm_raw_spss %>%
+  select(1:5) %>% head() %>% 
+  pandoc.table()
+```
+
+#### Data from Excel
+
+```{r show-excel, results="asis"}
+psm_raw_excel %>%
+  select(1:5) %>% head() %>%
+  pandoc.table()
+```
+
+Because of this weird discrepancy, I use all columnns from the SPSS data (since it takes care of the strange comma-separated values), but I add the ID column from Excel for identification and grouping purposes later. For now, I ignore `ACT`, `BIRTH`, and other columns that behave strangely.
+
+#### Final raw data
+
+```{r final-raw-data, results="asis"}
+psm_raw <- bind_cols(
+  select(psm_raw_excel, 1),
+  select(psm_raw_spss, -1)
+)
+
+psm_raw %>% 
+  select(1:5) %>% head() %>%
+  pandoc.table(missing = "")
+```
+
+
+## Calculate index totals
+
+### Map questions to indexes
+
+There is a simplified codebook that matches each of the questions in the survey to specific items in the four main PSM surveys:
+
+```{r loadl-clean-index, results="asis"}
+psm_codebook_simple <- read_excel(file.path(root, "data", "data_raw", "psm measures_1.xls"),
+                            sheet = "Sheet1", col_names = c("variable", "details", "question")) %>%
+  mutate(index = ifelse(str_detect(variable, "psm_"), NA, variable)) %>%
+  fill(index) %>%
+  filter(!is.na(details)) %>%
+  mutate(index = recode(index, `Int'l Measure` = "International"),
+         variable = str_to_upper(variable),
+         variable = recode(variable, PSM_25 = "PSM_25_R", PSM_41 = "PSM_41_R"))
+
+psm_codebook_simple %>% datatable()
+```
+
+### Calculate totals
+
+Using this cleaner data, I extract the questions that apply to each of the four indexes:
+
+```{r add-index-totals, results="asis"}
+grant_vars <- psm_codebook_simple %>% filter(index == "Grant") %>% pull(variable)
+intl_vars <- psm_codebook_simple %>% filter(index == "International") %>% pull(variable)
+msp_vars <- psm_codebook_simple %>% filter(index == "MSPB5") %>% pull(variable)
+perry_vars <- psm_codebook_simple %>% filter(index == "Perry") %>% pull(variable)
+
+index_vars <- tribble(
+  ~Index, ~Columns,
+  "Perry", perry_vars,
+  "MSPB5", msp_vars,
+  "Grant", grant_vars,
+  "International", intl_vars
+) %>%
+  mutate(Variables = Columns %>% map_int(~ length(.)),
+         Columns = Columns %>% map_chr(~ paste0("`", ., "`", collapse = ", ")))
+
+index_vars %>% pandoc.table(justify = "lll")
+```
+
+I add each of those columns up to create the index for each individual (and calculate the z-score):
+
+```{r calculate-index-totals, results="asis"}
+psm_indexes <- psm_raw %>%
+  mutate(index_perry = rowSums(select(., one_of(perry_vars))),
+         index_msp = rowSums(select(., one_of(msp_vars))),
+         index_grant = rowSums(select(., one_of(grant_vars))),
+         index_intl = rowSums(select(., one_of(intl_vars)))) %>%
+  mutate_at(vars(starts_with("index")), funs(z = scale(.)))
+
+psm_indexes %>% 
+  select(ID, starts_with("index")) %>%
+  head() %>%
+  pandoc.table(split.table = Inf, missing = "")
+```
+
+## Save data
+
+Finally, I save a clean version of the data for use elsewhere.
+
+```{r save-clean-data}
+write_csv(psm_indexes, file.path(root, "data", "data_clean", "psm_clean.csv"))
+```

@@ -2,6 +2,10 @@ name: "psm-measures"
 exclude: ["data", "misc", "Makefile", "LICENSE"]
 navbar:
   title: "Measuring Public Service Motivation"
+  right:
+    - text: "Data cleaning"
+      icon: fa-table
+      href: 01-clean_data.html
 output:
   html_document:
     theme: journal
