@@ -1,5 +1,5 @@
 name: "psm-measures"
-exclude: ["data", "misc", "Makefile", "LICENSE"]
+exclude: ["data", "misc", "Makefile", "LICENSE", "README.html"]
 navbar:
   title: "Measuring Public Service Motivation"
   right:
