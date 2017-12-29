@@ -1,18 +1,18 @@
 ---
 title: "Data cleaning"
 date: "2017-10-31"
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r load-libraries, message=FALSE, warning=FALSE}
-library(rprojroot)
 library(tidyverse)
 library(haven)
 library(readxl)
 library(pander)
 library(stringr)
 library(DT)
-
-root <- find_rstudio_root_file()
+library(here)
 ```
 
 ## Load data
@@ -25,10 +25,10 @@ There are two different versions of the data—an SPSS file and an Excel file—
 - Most other columns are fine, though some cells in Excel (like row 10 in `EDU_DAD`) have comma-separated values; in SPSS, the last value is used.
 
 ```{r load-data}
-psm_raw_spss <- read_spss(file.path(root, "data", "data_raw", "Student PSM Survey Data.sav")) %>% 
+psm_raw_spss <- read_spss(file.path(here(), "data", "data_raw", "Student PSM Survey Data.sav")) %>% 
   zap_formats() %>% zap_widths()
 
-psm_raw_excel <- read_excel(file.path(root, "data", "data_raw", "Student PSM Survey Master Data.xlsx"),
+psm_raw_excel <- read_excel(file.path(here(), "data", "data_raw", "Student PSM Survey Master Data.xlsx"),
                             sheet = "Master Data")
 ```
 
@@ -71,7 +71,7 @@ psm_raw %>%
 There is a simplified codebook that matches each of the questions in the survey to specific items in the four main PSM surveys:
 
 ```{r loadl-clean-index, results="asis"}
-psm_codebook_simple <- read_excel(file.path(root, "data", "data_raw", "psm measures_1.xls"),
+psm_codebook_simple <- read_excel(file.path(here(), "data", "data_raw", "psm measures_1.xls"),
                             sheet = "Sheet1", col_names = c("variable", "details", "question")) %>%
   mutate(index = ifelse(str_detect(variable, "psm_"), NA, variable)) %>%
   fill(index) %>%
@@ -127,5 +127,5 @@ psm_indexes %>%
 Finally, I save a clean version of the data for use elsewhere.
 
 ```{r save-clean-data}
-write_csv(psm_indexes, file.path(root, "data", "data_clean", "psm_clean.csv"))
+write_csv(psm_indexes, file.path(here(), "data", "data_clean", "psm_clean.csv"))
 ```
