@@ -8,7 +8,7 @@ navbar:
       href: 01-clean_data.html
     - text: "Summaries and distributions"
       icon: fa-bar-chart
-      href: distributions.html
+      href: 02-summaries.html
 output:
   html_document:
     theme: journal
