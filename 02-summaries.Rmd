@@ -1,27 +1,21 @@
 ---
-title: "Summaries and distributions"
-date: "2017-10-31"
+title: "Summary statistics"
+date: "2017-12-29"
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r load-libraries, message=FALSE, warning=FALSE}
-library(rprojroot)
 library(tidyverse)
 library(broom)
-library(forcats)
-library(stringr)
 library(pander)
 library(ggridges)
 library(viridis)
+library(here)
 
-root <- find_rstudio_root_file()
+source(file.path(here(), "lib", "graphics.R"))
 
-psm <- read_csv(file.path(root, "data", "data_clean", "psm_clean.csv"))
-
-theme_psm <- function(base_size = 11) {
-  final_theme <- theme_minimal(base_family = "Roboto Condensed", 
-                               base_size = base_size)
-  final_theme
-}
+psm <- read_csv(file.path(here(), "data", "data_clean", "psm_clean.csv"))
 ```
 
 ## Replicate original tables
@@ -53,17 +47,6 @@ psm_indexes_long <- psm %>%
                             MSPB5 = "index_msp",
                             Grant = "index_grant",
                             International = "index_intl"))
-
-psm_indexes_long_z <- psm %>%
-  select(ID, starts_with("index")) %>%
-  gather(index, value, -ID) %>%
-  filter(str_detect(index, "_z")) %>%
-  mutate(index = fct_inorder(index, ordered = TRUE),
-         index = fct_recode(index,
-                            Perry = "index_perry_z",
-                            MSPB5 = "index_msp_z",
-                            Grant = "index_grant_z",
-                            International = "index_intl_z"))
 
 psm_indexes_long %>%
   filter(!is.na(value)) %>%
@@ -183,48 +166,4 @@ ggplot(psm_cor_long, aes(x = fct_rev(rowname), y = fct_rev(var2), fill = value))
   coord_equal() +
   theme_psm() +
   theme(panel.grid.major = element_blank())
-```
-
-
-## Check equality of distributions
-
-### Raw index scores
-
-```{r plot-raw-scores-ridge, fig.width=8, fig.height=2.5, warning=FALSE}
-ggplot(psm_indexes_long, aes(x = value, y = fct_rev(index), fill = index)) + 
-  geom_density_ridges2(aes(height = ..density..),
-                       stat = "density", size = 0.25) +
-  scale_fill_viridis(discrete = TRUE, option = "viridis") +
-  guides(fill = FALSE) +
-  labs(x = "Index score", y = NULL) +
-  theme_psm() + 
-  theme(panel.grid.major.y = element_blank())
-```
-
-### Standardized scores
-
-```{r plot-std-scores-ridge, fig.width=8, fig.height=2.5, warning=FALSE}
-ggplot(psm_indexes_long_z, aes(x = value, y = fct_rev(index), fill = index)) + 
-  geom_density_ridges2(aes(height = ..density..),
-                       stat = "density", size = 0.25) +
-  scale_fill_viridis(discrete = TRUE, option = "viridis") +
-  guides(fill = FALSE) +
-  labs(x = "Standardized z-score", y = NULL) +
-  theme_psm() + 
-  theme(panel.grid.major.y = element_blank())
-```
-
-Or as a violin chart:
-
-```{r plot-std-scores-violin, fig.width=8, fig.height=4, warning=FALSE}
-set.seed(1234)
-ggplot(psm_indexes_long_z, aes(x = index, y = value, fill = index)) +
-  geom_violin() +
-  geom_point(position = "jitter", size = 0.5, alpha = 0.2) +
-  stat_summary(fun.y = "mean", colour = "#eb6864", size = 4, geom = "point") +
-  scale_fill_viridis(discrete = TRUE, option = "viridis") + 
-  guides(fill = FALSE) +
-  labs(x = NULL, y = "Standardized z-score") +
-  theme_psm() +
-  theme(panel.grid.major.x = element_blank())
 ```

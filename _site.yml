@@ -6,7 +6,7 @@ navbar:
     - text: "Data cleaning"
       icon: fa-table
       href: 01-clean_data.html
-    - text: "Summaries and distributions"
+    - text: "Summary statistics"
       icon: fa-bar-chart
       href: 02-summaries.html
 output:
