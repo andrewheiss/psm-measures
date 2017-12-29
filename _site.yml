@@ -9,6 +9,9 @@ navbar:
     - text: "Summary statistics"
       icon: fa-bar-chart
       href: 02-summaries.html
+    - text: "Distributions"
+      icon: fa-area-chart
+      href: 03-distributions.html
 output:
   html_document:
     theme: journal

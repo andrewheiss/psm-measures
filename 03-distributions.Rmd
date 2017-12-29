@@ -1,0 +1,138 @@
+---
+title: "Compare distributions"
+date: "2017-12-29"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r load-libraries, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(broom)
+library(ggridges)
+library(viridis)
+library(here)
+
+source(file.path(here(), "lib", "graphics.R"))
+
+psm <- read_csv(file.path(here(), "data", "data_clean", "psm_clean.csv"))
+
+psm_indexes_long <- psm %>%
+  select(ID, starts_with("index")) %>%
+  gather(index, value, -ID) %>%
+  filter(!str_detect(index, "_z")) %>%
+  mutate(index = fct_inorder(index, ordered = TRUE),
+         index = fct_recode(index,
+                            Perry = "index_perry",
+                            MSPB5 = "index_msp",
+                            Grant = "index_grant",
+                            International = "index_intl"))
+
+psm_indexes_long_z <- psm %>%
+  select(ID, starts_with("index")) %>%
+  gather(index, value, -ID) %>%
+  filter(str_detect(index, "_z")) %>%
+  mutate(index = fct_inorder(index, ordered = TRUE),
+         index = fct_recode(index,
+                            Perry = "index_perry_z",
+                            MSPB5 = "index_msp_z",
+                            Grant = "index_grant_z",
+                            International = "index_intl_z"))
+```
+
+
+## Raw index scores
+
+```{r plot-raw-scores-ridge, fig.width=8, fig.height=2.5, warning=FALSE}
+ggplot(psm_indexes_long, aes(x = value, y = fct_rev(index), fill = index)) + 
+  geom_density_ridges2(aes(height = ..density..),
+                       stat = "density", size = 0.25) +
+  scale_fill_viridis(discrete = TRUE, option = "viridis") +
+  guides(fill = FALSE) +
+  labs(x = "Index score", y = NULL) +
+  theme_psm() + 
+  theme(panel.grid.major.y = element_blank())
+```
+
+
+## Standardized scores
+
+```{r plot-std-scores-ridge, fig.width=8, fig.height=2.5, warning=FALSE}
+ggplot(psm_indexes_long_z, aes(x = value, y = fct_rev(index), fill = index)) + 
+  geom_density_ridges2(aes(height = ..density..),
+                       stat = "density", size = 0.25) +
+  scale_fill_viridis(discrete = TRUE, option = "viridis") +
+  guides(fill = FALSE) +
+  labs(x = "Standardized z-score", y = NULL) +
+  theme_psm() + 
+  theme(panel.grid.major.y = element_blank())
+```
+
+Or as a violin chart:
+
+```{r plot-std-scores-violin, fig.width=8, fig.height=4, warning=FALSE}
+set.seed(1234)
+ggplot(psm_indexes_long_z, aes(x = index, y = value, fill = index)) +
+  geom_violin() +
+  geom_point(position = "jitter", size = 0.5, alpha = 0.2) +
+  stat_summary(fun.y = "mean", colour = "#eb6864", size = 4, geom = "point") +
+  scale_fill_viridis(discrete = TRUE, option = "viridis") + 
+  guides(fill = FALSE) +
+  labs(x = NULL, y = "Standardized z-score") +
+  theme_psm() +
+  theme(panel.grid.major.x = element_blank())
+```
+
+
+## Check equality of distributions
+
+```{r ks-calculations, warning=FALSE, fig.width=5, fig.height=5}
+psm_indexes <- psm %>%
+  select(ID, starts_with("index")) 
+
+# Null = distributions are the same
+# If p is small, groups came from populations with different distributions
+# https://www.graphpad.com/guides/prism/7/statistics/index.htm?interpreting_results_kolmogorov-smirnov_test.htm
+ks_tests <- tribble(
+  ~var1, ~var2, ~results,
+  "Perry", "International", ks.test(psm_indexes$index_perry_z, psm_indexes$index_intl_z),
+  "Perry", "Grant", ks.test(psm_indexes$index_perry_z, psm_indexes$index_grant_z),
+  "Perry", "MSP85", ks.test(psm_indexes$index_perry_z, psm_indexes$index_msp_z),
+  "MSP85", "International", ks.test(psm_indexes$index_msp_z, psm_indexes$index_intl_z),
+  "MSP85", "Grant", ks.test(psm_indexes$index_msp_z, psm_indexes$index_grant_z),
+  "Grant", "International", ks.test(psm_indexes$index_grant_z, psm_indexes$index_intl_z)
+) %>%
+  mutate(bloop = results %>% map(tidy)) %>%
+  unnest(bloop)
+
+ks_blanks <- data_frame(var1 = c("Perry", "MSP85", "Grant", "International")) %>%
+  mutate(var2 = var1,
+         statistic = 0)
+
+star.labs <- c("***", "**", "*", "")
+star.nums <- c("p < 0.001", "p < 0.01", "p < 0.05", "p > 0.05")
+
+ks_long <- bind_rows(ks_tests, ks_blanks) %>%
+  mutate_at(vars(var1, var2), funs(factor(., levels = ks_blanks$var1, ordered = TRUE))) %>%
+  mutate(stars = as.character(symnum(p.value, 
+                                     cutpoints = c(0, 0.001, 0.01, 0.05, 1),
+                                     symbols = star.labs)),
+         stars = ifelse(stars == "?", NA, stars),
+         stars = factor(stars, levels = star.labs, ordered = TRUE),
+         label = ifelse(!is.na(stars), paste(round(statistic, 2), stars), ""))
+
+ggplot(ks_long, aes(x = fct_rev(var2), y = fct_rev(var1), fill = stars)) +
+  geom_tile() +
+  geom_text(aes(label = label),
+            family = "Roboto Condensed", fontface = "plain") +
+  scale_fill_manual(values = rev(c("#feedde", "#fdbe85", "#fd8d3c", "#d94701")),
+                    breaks = star.labs, labels = star.nums, name = NULL,
+                    drop = FALSE, na.value = "grey95") +
+  labs(x = NULL, y = NULL, title = "Kolmogorov-Smirnov statistics",
+       subtitle = "Pairwise comparison between standardized distributions") +
+  coord_equal() +
+  theme_psm() +
+  theme(panel.grid.major = element_blank(),
+        legend.position = "bottom")
+```
+
+Grant is different from everything else; nothing else is different from each other.
