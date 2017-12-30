@@ -10,6 +10,8 @@ library(tidyverse)
 library(broom)
 library(ggridges)
 library(viridis)
+library(flexmix)
+library(pander)
 library(here)
 
 source(file.path(here(), "lib", "graphics.R"))
@@ -136,3 +138,24 @@ ggplot(ks_long, aes(x = fct_rev(var2), y = fct_rev(var1), fill = stars)) +
 ```
 
 Grant is different from everything else; nothing else is different from each other.
+
+
+## Check divergence of distributions
+
+Instead of hypothesis testing, we can see how much entropic divergence there is between different distributions. Kullback-Leibler (KL) divergence is particularly useful for comparing two probability distributions. [This blog post](https://www.countbayesie.com/blog/2017/5/9/kullback-leibler-divergence-explained) is really helpful for getting the intuition behind KL divergence, and [this post](https://www.johndcook.com/blog/2017/11/08/why-is-kullback-leibler-divergence-not-a-distance/) and [this video](https://youtu.be/BSGz-NRzl74?t=47m50s) (starting at 47:52) explain why it's asymmetric and what that actually means. ([Though good luck interpreting it in any non-information theoretic way](https://stats.stackexchange.com/questions/111445/analysis-of-kullback-leibler-divergence)).
+
+Calculating the KL divergence statistic is surprisingly convoluted in R. There are a ton of different packages that do it (`entropy`, `philentropy`, `flexmix`, `FNN`, and `laplacesdemons`, to name a few), and they all have different syntaxes. Additionally, some are designed to deal with discrete random variables, not continuous random variables, so they require discretized vectors to work (like `entropy`: you have to run `KL.empirical(discretize(x1, numBins = N), discretize(x2, numBins = N))`, and `numBins` has a huge effect on the divergence if the vectors aren't huge). 
+
+Fortunately, `flexmix::KLdiv()` works well with continuous random variables (it probably does some magic discretization behind the scenes?), *and* it will output a matrix of all pairwise comparisons if you feed it a matrix with multiple columns.
+
+In general, the smaller the number, the less divergence there is. There's no magic critical value—just that values closer to zero mean the distributions are more similar.
+
+```{r kl-calculations, results="asis"}
+index_densities <- cbind(perry = density(psm_indexes$index_perry_z, na.rm = TRUE)$y, 
+                         msp = density(psm_indexes$index_msp_z, na.rm = TRUE)$y,
+                         grant = density(psm_indexes$index_grant_z, na.rm = TRUE)$y,
+                         intl = density(psm_indexes$index_intl_z, na.rm = TRUE)$y)
+
+round(flexmix::KLdiv(index_densities), 3) %>%
+  pandoc.table()
+```
